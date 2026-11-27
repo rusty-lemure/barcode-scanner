@@ -1,0 +1,682 @@
+<!doctype html>
+<html lang="en" dir="ltr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#1D5E68">
+<title>Room by room scanner</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Crect width='24' height='24' rx='5' fill='%231D5E68'/%3E%3Cpath d='M6 7v10M9 7v10M11.5 7v10M14.5 7v10M18 7v10' stroke='white' stroke-width='1.8'/%3E%3C/svg%3E">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Assistant:wght@400;600;700&family=Secular+One&display=swap" rel="stylesheet">
+<style>
+/* Same palette and type as Room by room. Rooms as chips, items as a tappable list, a full-screen camera sheet per item. */
+:root{
+  --bg:#EEF2F1; --surface:#FFFFFF; --ink:#12323A; --ink-2:#536D74; --line:#D2DCDB;
+  --accent:#1D5E68; --on-accent:#FFFFFF; --new:#EBA43C; --new-tint:#FBEBD2; --on-new:#3B2503;
+  --ok:#1E7A4C; --bad:#A63A25; --scrim:rgba(8,22,26,.5);
+  --f-display:"Secular One","Assistant",system-ui,"Arial Hebrew",Arial,sans-serif;
+  --f-body:"Assistant",system-ui,-apple-system,"Segoe UI","Arial Hebrew",Arial,sans-serif;
+  color-scheme:light;
+}
+@media (prefers-color-scheme:dark){:root{
+  --bg:#0D191C; --surface:#14252A; --ink:#E2ECEB; --ink-2:#98AEB1; --line:#25393E;
+  --accent:#6DBAC2; --on-accent:#0B1719; --new:#F0B04F; --new-tint:#3A2B12; --on-new:#241500;
+  --ok:#6CCB97; --bad:#EC806A; --scrim:rgba(0,0,0,.6); color-scheme:dark}}
+*,*::before,*::after{box-sizing:border-box}
+[hidden]{display:none!important}
+html{-webkit-text-size-adjust:100%}
+body{margin:0;background:var(--bg);color:var(--ink);font:400 17px/1.45 var(--f-body);-webkit-font-smoothing:antialiased}
+button{font:inherit;color:inherit;background:none;border:0;padding:0;cursor:pointer;-webkit-tap-highlight-color:transparent}
+button:disabled{opacity:.4;cursor:default}
+input,textarea{font:inherit;color:inherit}
+:focus-visible{outline:3px solid var(--accent);outline-offset:2px}
+.ic{flex:none;display:block}
+.wrap{max-width:640px;margin-inline:auto;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+
+/* header */
+.top{padding-top:calc(env(safe-area-inset-top,0px) + 12px)}
+.top-row{display:flex;align-items:center;gap:10px}
+.brand{font:400 22px/1.1 var(--f-display);margin:0;flex:1}
+.icon-btn{width:44px;height:44px;border-radius:10px;display:grid;place-items:center;flex:none}
+.icon-btn:hover{background:var(--surface)}
+.search{display:flex;align-items:center;gap:8px;margin-top:12px;background:var(--surface);border:1.5px solid var(--line);border-radius:12px;padding-inline:12px}
+.search:focus-within{border-color:var(--accent)}
+.search input{flex:1;min-width:0;min-height:46px;border:0;background:transparent;font-size:17px;outline:none}
+.search .ic{color:var(--ink-2)}
+
+/* rooms */
+.strip-wrap{position:sticky;top:0;z-index:5;background:var(--bg);border-bottom:1px solid var(--line);margin-top:12px}
+.strip{display:flex;gap:8px;overflow-x:auto;scrollbar-width:none;padding-block:10px}
+.strip::-webkit-scrollbar{display:none}
+.chip{flex:none;display:flex;align-items:center;gap:8px;min-height:44px;padding:0 14px;border-radius:10px;background:var(--surface);border:1px solid var(--line);font-weight:600;font-size:15px;white-space:nowrap}
+.chip small{font-size:13px;color:var(--ink-2);font-weight:700;font-variant-numeric:tabular-nums}
+.chip[aria-selected="true"]{background:var(--ink);border-color:var(--ink);color:var(--bg)}
+.chip[aria-selected="true"] small{color:inherit;opacity:.8}
+.toggle{display:inline-flex;align-items:center;gap:10px;min-height:44px;font-size:15px;color:var(--ink-2);cursor:pointer;margin-top:6px}
+.toggle input{width:20px;height:20px;accent-color:var(--accent);margin:0}
+
+/* items */
+main{padding-bottom:calc(110px + env(safe-area-inset-bottom,0px))}
+.room-name{font:400 30px/1.15 var(--f-display);margin:16px 0 0;overflow-wrap:anywhere}
+.items{list-style:none;margin:8px 0 0;padding:0}
+.item{display:flex;width:100%;align-items:center;gap:12px;padding:12px 0;border-bottom:1px solid var(--line);text-align:start;min-height:60px}
+.item-main{flex:1;min-width:0}
+.item-name{display:block;font-size:17px;font-weight:600;line-height:1.3;overflow-wrap:anywhere}
+.item-meta{display:flex;flex-wrap:wrap;gap:4px 10px;font-size:13px;color:var(--ink-2);margin-top:3px;align-items:center}
+.item-meta .none{color:var(--ink-2)}
+.item-meta .has{color:var(--ok);font-weight:700}
+.pill{display:inline-block;padding:0 8px;border-radius:6px;background:var(--new);color:var(--on-new);font-weight:700;font-size:12px;line-height:20px}
+.cam-tap{width:46px;height:46px;border-radius:12px;border:1.5px solid var(--line);background:var(--surface);display:grid;place-items:center;flex:none;color:var(--accent)}
+.empty{color:var(--ink-2);padding:24px 0}
+
+/* bottom bar */
+.bar{position:fixed;inset:auto 0 0 0;z-index:8;background:var(--surface);border-top:1px solid var(--line);padding-bottom:env(safe-area-inset-bottom,0px)}
+.bar .wrap{display:flex;align-items:center;gap:10px;min-height:68px}
+.bar-count{flex:1;font-weight:600;min-width:0;text-align:start}
+.bar .btn{flex:none;white-space:nowrap}
+.bar-count small{display:block;font-weight:400;color:var(--ink-2);font-size:13px}
+.btn{min-height:46px;padding:0 16px;border-radius:10px;border:1px solid var(--line);background:var(--surface);color:var(--ink);font-weight:600;font-size:16px;display:inline-flex;align-items:center;justify-content:center;gap:8px;text-align:center;line-height:1.2}
+.btn.primary{background:var(--accent);border-color:var(--accent);color:var(--on-accent)}
+.btn.danger{color:var(--bad)}
+.btn.block{width:100%}
+
+/* setup */
+.setup h2{font:400 30px/1.15 var(--f-display);margin:20px 0 8px}
+.setup ol{margin:0 0 16px;padding-inline-start:22px;color:var(--ink-2)}
+.setup ol li{margin-bottom:6px}
+textarea.paste{width:100%;min-height:140px;border:1.5px solid var(--line);border-radius:12px;background:var(--surface);color:var(--ink);padding:12px;font-size:15px;line-height:1.4;resize:vertical}
+textarea.paste:focus{outline:none;border-color:var(--accent)}
+.row{display:flex;flex-wrap:wrap;gap:10px;margin-top:12px}
+.err{color:var(--bad);font-weight:600;margin:10px 0 0}
+.hint{color:var(--ink-2);font-size:15px;margin:10px 0 0}
+.file-btn{position:relative;overflow:hidden}
+.file-btn input{position:absolute;inset:0;opacity:0;cursor:pointer;font-size:0}
+
+/* scan sheet */
+.scan{position:fixed;inset:0;z-index:20;background:#000;color:#fff;display:flex;flex-direction:column}
+.scan-head{display:flex;align-items:center;gap:8px;padding:calc(env(safe-area-inset-top,0px) + 8px) max(8px,env(safe-area-inset-right,0px)) 8px max(8px,env(safe-area-inset-left,0px))}
+.scan-head .title{flex:1;min-width:0;font-weight:700;font-size:18px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.scan-head .icon-btn{color:#fff}
+.scan-head .icon-btn:hover{background:rgba(255,255,255,.12)}
+.scan-head .icon-btn[aria-pressed="true"]{background:#fff;color:#000}
+.view{position:relative;flex:1;min-height:0;overflow:hidden}
+.view video{position:absolute;inset:0;width:100%;height:100%;object-fit:cover}
+.aim{position:absolute;left:8%;right:8%;top:38%;height:24%;border:3px solid rgba(255,255,255,.9);border-radius:14px;box-shadow:0 0 0 100vmax rgba(0,0,0,.35);pointer-events:none}
+.aim.hit{border-color:#6CCB97}
+.view .msg{position:absolute;left:16px;right:16px;top:14px;text-align:center;font-weight:600;text-shadow:0 1px 3px rgba(0,0,0,.8)}
+.panel{background:var(--bg);color:var(--ink);border-radius:18px 18px 0 0;padding:16px max(16px,env(safe-area-inset-right,0px)) calc(16px + env(safe-area-inset-bottom,0px)) max(16px,env(safe-area-inset-left,0px));max-height:70vh;overflow:auto}
+.code-big{font-size:30px;font-weight:700;letter-spacing:1px;font-variant-numeric:tabular-nums;margin:0}
+.note{font-size:15px;margin:6px 0 0;color:var(--ink-2)}
+.note.warn{color:var(--bad);font-weight:600}
+.field{display:block;margin-top:12px}
+.field>span{display:block;font-size:13px;font-weight:700;color:var(--ink-2);margin-bottom:6px}
+.field input{width:100%;min-height:48px;border:1.5px solid var(--line);border-radius:10px;background:var(--surface);color:var(--ink);padding:0 12px;font-size:17px}
+.field input:focus{outline:none;border-color:var(--accent)}
+.inline{display:flex;gap:8px}
+.inline input{flex:1;min-width:0}
+.actions{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:14px}
+.actions .btn.wide{grid-column:1/-1}
+.alt{display:flex;flex-wrap:wrap;gap:10px;margin-top:4px}
+
+/* sheets */
+.sheet-root{position:fixed;inset:0;z-index:30}
+.backdrop{position:absolute;inset:0;background:var(--scrim)}
+.sheet{position:absolute;inset-inline:0;bottom:0;margin-inline:auto;max-width:560px;max-height:88vh;overflow:auto;background:var(--bg);border-radius:18px 18px 0 0;padding:20px max(20px,env(safe-area-inset-right,0px)) calc(20px + env(safe-area-inset-bottom,0px)) max(20px,env(safe-area-inset-left,0px))}
+.sheet h2{font:400 24px/1.2 var(--f-display);margin:0 0 12px}
+.sheet h3{font-size:17px;margin:16px 0 4px}
+.scan-list{list-style:none;margin:0;padding:0}
+.scan-list li{display:flex;align-items:center;gap:8px;padding:8px 0;border-bottom:1px solid var(--line)}
+.scan-list .num{font-variant-numeric:tabular-nums;font-weight:700}
+.scan-list .lbl{color:var(--ink-2);font-size:15px;flex:1;min-width:0;overflow-wrap:anywhere}
+.mini{width:40px;height:40px;border-radius:9px;display:grid;place-items:center;color:var(--ink-2);flex:none}
+.seg{display:flex;background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:3px}
+.seg button{flex:1;min-height:40px;border-radius:9px;font-weight:600;color:var(--ink-2)}
+.seg button[aria-pressed="true"]{background:var(--ink);color:var(--bg)}
+.menu-list{list-style:none;margin:16px 0 0;padding:0}
+.menu-list button{display:flex;width:100%;align-items:center;gap:14px;min-height:54px;border-bottom:1px solid var(--line);font-size:17px;text-align:start}
+.menu-list li:first-child button{border-top:1px solid var(--line)}
+.sheet-actions{display:flex;gap:10px;margin-top:18px}
+.sheet-actions .btn{flex:1}
+
+#toast{position:fixed;inset-inline:16px;bottom:calc(84px + env(safe-area-inset-bottom,0px));margin-inline:auto;max-width:480px;z-index:40;display:flex;align-items:center;justify-content:space-between;gap:12px;background:var(--ink);color:var(--bg);border-radius:12px;padding-block:6px;padding-inline:16px 6px;min-height:50px;font-size:15px;transform:translateY(200%);opacity:0;transition:transform .2s ease,opacity .2s ease;pointer-events:none}
+#toast.show{transform:none;opacity:1;pointer-events:auto}
+#toast .undo{color:var(--new);font-weight:700;min-height:40px;padding-inline:12px}
+@media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
+</style>
+</head>
+<body>
+<div id="app"></div>
+<div id="scan" class="scan" hidden></div>
+<div id="sheet" class="sheet-root" hidden></div>
+<div id="toast" role="status" aria-live="polite"></div>
+<script>
+(function () {
+'use strict';
+const KEY = 'rbr-scanner-v1';
+const ITEMS_TAG = 'ROOM-BY-ROOM ITEMS 1';
+const SCANS_TAG = 'ROOM-BY-ROOM BARCODES 1';
+const ZXING_URL = 'https://cdn.jsdelivr.net/npm/@zxing/library@0.21.3/umd/index.min.js';
+
+const L = {
+  en: {
+    title: 'Scanner', menu: 'Menu', search: 'Find an item',
+    setupTitle: 'Load your items',
+    setup1: 'In Room by room, open Menu → Copy items for the scanner.',
+    setup2: 'Come back here and paste below.',
+    pastePh: 'Paste the items here', load: 'Load items', orFile: 'Or choose the spreadsheet you exported (CSV)',
+    loadBad: 'No items found. Paste what Room by room copied, or choose its exported spreadsheet.',
+    loaded: n => `Loaded ${n} items`,
+    onlyMissing: 'Only items without a barcode', allRooms: 'All rooms',
+    noBarcode: 'No barcode yet', nBarcodes: n => n === 1 ? '1 barcode' : `${n} barcodes`, nNew: n => `+${n} new`,
+    noItems: 'Nothing to show here.', noMatch: 'No items match.',
+    scanItem: s => `Scan a barcode for ${s}`,
+    scans: n => n === 1 ? '1 scan' : `${n} scans`, noScans: 'No scans yet',
+    scansHint: 'Tap an item to scan its barcode.', reviewHint: 'Tap to review them', copyShort: 'Copy', copyFor: 'Copy for Room by room',
+    copied: 'Copied. In Room by room, open Menu → Paste barcodes from the scanner.',
+    copyFail: 'Copying isn’t allowed here. Select the text below and copy it.',
+    close: 'Close', torch: 'Light',
+    starting: 'Starting the camera…', aim: 'Hold the barcode inside the frame',
+    camBlocked: 'The camera is blocked for this page. In Chrome, tap the icon left of the address, then Permissions → Camera → Allow.',
+    camInsecure: 'The camera only works when the scanner is opened from its web address.',
+    camFail: s => `The camera didn’t start (${s}).`,
+    camNone: 'Type the number below, or choose a photo of the barcode.',
+    found: 'Found', labelOpt: 'Label (optional)', labelPh: 'e.g. brand or size',
+    dupHere: 'This item already has this barcode.', alsoOn: s => `Also saved on ${s}.`,
+    save: 'Save', saveMore: 'Save and scan another', again: 'Scan again',
+    typeNum: 'Or type the number', add: 'Add', photo: 'Choose a photo',
+    badNum: 'Enter 8 to 14 digits.', reading: 'Reading the photo…',
+    photoFail: 'No barcode found in that photo. Try a closer, sharper photo.',
+    saved: s => `Saved for ${s}`, undo: 'Undo',
+    scansTitle: 'Scans', remove: s => `Remove ${s}`, clear: 'Clear scans', clearSure: 'Tap again to clear all scans',
+    cleared: 'Scans cleared', updateItems: 'Update items', language: 'Language', done: 'Done', cancel: 'Cancel',
+    keepScans: 'Your scans stay. Only the item list is replaced.',
+    itemCol: ['item', 'items', 'פריט', 'פריטים']
+  },
+  he: {
+    title: 'סורק', menu: 'תפריט', search: 'חיפוש פריט',
+    setupTitle: 'טעינת הפריטים',
+    setup1: 'בחדר אחר חדר, פותחים תפריט ← העתקת פריטים לסורק.',
+    setup2: 'חוזרים לכאן ומדביקים למטה.',
+    pastePh: 'הדביקו כאן את הפריטים', load: 'טעינת פריטים', orFile: 'או בחרו את הגיליון שייצאתם (CSV)',
+    loadBad: 'לא נמצאו פריטים. הדביקו את מה שהועתק מחדר אחר חדר, או בחרו את הגיליון שייצאתם.',
+    loaded: n => `נטענו ${n} פריטים`,
+    onlyMissing: 'רק פריטים בלי ברקוד', allRooms: 'כל החדרים',
+    noBarcode: 'אין עדיין ברקוד', nBarcodes: n => n === 1 ? 'ברקוד אחד' : `${n} ברקודים`, nNew: n => n === 1 ? 'חדש אחד' : `${n} חדשים`,
+    noItems: 'אין מה להציג כאן.', noMatch: 'אין פריטים מתאימים.',
+    scanItem: s => `סריקת ברקוד עבור ${s}`,
+    scans: n => n === 1 ? 'סריקה אחת' : `${n} סריקות`, noScans: 'אין עדיין סריקות',
+    scansHint: 'לוחצים על פריט כדי לסרוק את הברקוד שלו.', reviewHint: 'לחצו כדי לראות אותן', copyShort: 'העתקה', copyFor: 'העתקה לחדר אחר חדר',
+    copied: 'הועתק. בחדר אחר חדר, פותחים תפריט ← הדבקת ברקודים מהסורק.',
+    copyFail: 'אין כאן הרשאה להעתיק. סמנו את הטקסט למטה והעתיקו אותו.',
+    close: 'סגירה', torch: 'פנס',
+    starting: 'מפעיל את המצלמה…', aim: 'החזיקו את הברקוד בתוך המסגרת',
+    camBlocked: 'המצלמה חסומה בדף הזה. ב־Chrome, לחצו על הסמל שמשמאל לכתובת, ואז הרשאות ← מצלמה ← אישור.',
+    camInsecure: 'המצלמה עובדת רק כשהסורק נפתח מהכתובת שלו באינטרנט.',
+    camFail: s => `המצלמה לא נפתחה (${s}).`,
+    camNone: 'אפשר להקליד את המספר למטה, או לבחור תמונה של הברקוד.',
+    found: 'נמצא', labelOpt: 'תווית (לא חובה)', labelPh: 'למשל מותג או גודל',
+    dupHere: 'הברקוד הזה כבר שמור בפריט.', alsoOn: s => `שמור גם ב${s}.`,
+    save: 'שמירה', saveMore: 'שמירה וסריקה נוספת', again: 'סריקה מחדש',
+    typeNum: 'או הקלדת המספר', add: 'הוספה', photo: 'בחירת תמונה',
+    badNum: 'יש להזין 8 עד 14 ספרות.', reading: 'קורא את התמונה…',
+    photoFail: 'לא נמצא ברקוד בתמונה. נסו תמונה קרובה וחדה יותר.',
+    saved: s => `נשמר עבור ${s}`, undo: 'ביטול',
+    scansTitle: 'סריקות', remove: s => `הסרת ${s}`, clear: 'ניקוי הסריקות', clearSure: 'לחצו שוב כדי לנקות את כל הסריקות',
+    cleared: 'הסריקות נוקו', updateItems: 'עדכון הפריטים', language: 'שפה', done: 'סיום', cancel: 'ביטול',
+    keepScans: 'הסריקות נשארות. רק רשימת הפריטים מתחלפת.',
+    itemCol: ['item', 'items', 'פריט', 'פריטים']
+  }
+};
+
+/* ---------- helpers ---------- */
+const $ = (s, el) => (el || document).querySelector(s);
+const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+const norm = s => String(s || '').trim().replace(/\s+/g, ' ').toLocaleLowerCase();
+const tidy = s => String(s || '').trim().replace(/\s+/g, ' ');
+const iso = s => '⁨' + s + '⁩';
+const sleep = ms => new Promise(r => setTimeout(r, ms));
+const ICONS = {
+  dots: '<circle cx="5" cy="12" r="1.7" fill="currentColor" stroke="none"/><circle cx="12" cy="12" r="1.7" fill="currentColor" stroke="none"/><circle cx="19" cy="12" r="1.7" fill="currentColor" stroke="none"/>',
+  search: '<circle cx="11" cy="11" r="6.5"/><path d="M20 20l-4.2-4.2"/>',
+  camera: '<path d="M4 8h3l2-3h6l2 3h3v11H4z"/><circle cx="12" cy="13" r="3.5"/>',
+  x: '<path d="M6 6l12 12M18 6L6 18"/>',
+  copy: '<rect x="8" y="8" width="12" height="12" rx="2"/><path d="M16 8V5a1 1 0 0 0-1-1H5a1 1 0 0 0-1 1v10a1 1 0 0 0 1 1h3"/>',
+  torch: '<path d="M8 3h8l-1 6H9z"/><path d="M9 9h6v12H9z"/><path d="M12 13v3"/>',
+  image: '<rect x="4" y="5" width="16" height="14" rx="2"/><circle cx="9" cy="10" r="1.6"/><path d="M20 16l-5-5-8 8"/>',
+  trash: '<path d="M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13"/>',
+  list: '<path d="M8 6h12M8 12h12M8 18h12"/><circle cx="4" cy="6" r="1" fill="currentColor"/><circle cx="4" cy="12" r="1" fill="currentColor"/><circle cx="4" cy="18" r="1" fill="currentColor"/>',
+  refresh: '<path d="M20 12a8 8 0 1 1-2.4-5.7M20 4v5h-5"/>'
+};
+const icon = (n, s) => `<svg class="ic" width="${s || 22}" height="${s || 22}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${ICONS[n]}</svg>`;
+
+/* ---------- state ---------- */
+function load() {
+  let s = null;
+  try { s = JSON.parse(localStorage.getItem(KEY) || 'null'); } catch (e) { s = null; }
+  s = s && typeof s === 'object' ? s : {};
+  s.lang = s.lang === 'he' ? 'he' : (s.lang === 'en' ? 'en' : (/^he/i.test(navigator.language || '') ? 'he' : 'en'));
+  s.rooms = Array.isArray(s.rooms) ? s.rooms : null;
+  s.scans = Array.isArray(s.scans) ? s.scans : [];
+  s.room = typeof s.room === 'number' ? s.room : 0;
+  s.onlyMissing = !!s.onlyMissing;
+  return s;
+}
+const S = load();
+let query = '';
+function save() { try { localStorage.setItem(KEY, JSON.stringify({ lang: S.lang, rooms: S.rooms, scans: S.scans, room: S.room, onlyMissing: S.onlyMissing })); } catch (e) { /* storage off */ } }
+const t = (k, ...a) => { const v = L[S.lang][k] !== undefined ? L[S.lang][k] : L.en[k]; return typeof v === 'function' ? v(...a) : v; };
+
+function itemById(id) { if (!S.rooms) return null; for (const r of S.rooms) for (const it of r.items) if (it.id === id) return it; return null; }
+function roomsOf(id) { return (S.rooms || []).filter(r => r.items.some(i => i.id === id)).map(r => r.n); }
+const savedCodes = id => { const it = itemById(id); return it ? it.c : []; };
+const newCodes = id => S.scans.filter(s => s.id === id).map(s => s.c);
+const allCodes = id => [...new Set(savedCodes(id).concat(newCodes(id)))];
+function otherItemsWith(code, id) {
+  const names = new Set();
+  (S.rooms || []).forEach(r => r.items.forEach(i => { if (i.id !== id && i.c.includes(code)) names.add(i.n); }));
+  S.scans.forEach(s => { if (s.id !== id && s.c === code) names.add(s.n); });
+  return [...names];
+}
+
+/* ---------- loading items ---------- */
+function parseCSV(text) {
+  text = text.replace(/^﻿/, '');
+  const first = (text.split(/\r?\n/).find(l => l.trim()) || '');
+  const counts = { ',': 0, ';': 0, '\t': 0 }; let q = false;
+  for (const ch of first) { if (ch === '"') q = !q; else if (!q && ch in counts) counts[ch]++; }
+  const d = Object.keys(counts).sort((a, b) => counts[b] - counts[a])[0];
+  const rows = []; let row = [], field = '', inQ = false;
+  for (let i = 0; i < text.length; i++) {
+    const c = text[i];
+    if (inQ) { if (c === '"') { if (text[i + 1] === '"') { field += '"'; i++; } else inQ = false; } else field += c; continue; }
+    if (c === '"') inQ = true;
+    else if (c === d) { row.push(field); field = ''; }
+    else if (c === '\n') { row.push(field); rows.push(row); row = []; field = ''; }
+    else if (c !== '\r') field += c;
+  }
+  if (field !== '' || row.length) { row.push(field); rows.push(row); }
+  return rows;
+}
+function cleanRooms(rooms) {
+  if (!Array.isArray(rooms)) return null;
+  const out = rooms.map(r => ({
+    n: tidy(r && r.n) || '?',
+    items: (Array.isArray(r && r.items) ? r.items : []).filter(i => i && i.id && i.n).map(i => ({ id: String(i.id), n: tidy(i.n), c: (Array.isArray(i.c) ? i.c : []).map(String).filter(x => /^\d{8,14}$/.test(x)) }))
+  })).filter(r => r.items.length);
+  return out.length ? out : null;
+}
+function parseItems(text) {
+  text = String(text || '').replace(/^﻿/, '').trim();
+  if (!text) return null;
+  const at = text.indexOf(ITEMS_TAG);
+  if (at >= 0) {
+    const a = text.indexOf('{', at), b = text.lastIndexOf('}');
+    if (a < 0 || b < a) return null;
+    try { return cleanRooms(JSON.parse(text.slice(a, b + 1)).rooms); } catch (e) { return null; }
+  }
+  const rows = parseCSV(text); const rooms = [], by = new Map(), ids = new Map();
+  rows.forEach((r, idx) => {
+    const room = tidy(r[0]), name = tidy(r[2]);
+    if (!room || !name) return;
+    if (idx === 0 && t('itemCol').includes(norm(name))) return;
+    if (/^(1|yes|true|y|x|כן)$/i.test(tidy(r[9]))) return;
+    let rm = by.get(norm(room)); if (!rm) { rm = { n: room, items: [] }; by.set(norm(room), rm); rooms.push(rm); }
+    const id = 'name:' + norm(name);
+    const codes = (String(r[10] || '').match(/\d{8,14}/g) || []);
+    if (!rm.items.some(i => i.id === id)) rm.items.push({ id, n: name, c: codes });
+    ids.set(id, (ids.get(id) || []).concat(codes));
+  });
+  rooms.forEach(rm => rm.items.forEach(i => { i.c = [...new Set(ids.get(i.id) || i.c)]; }));
+  return cleanRooms(rooms);
+}
+function applyItems(rooms) {
+  S.rooms = rooms; S.room = Math.min(S.room, rooms.length - 1); save();
+  const n = new Set(); rooms.forEach(r => r.items.forEach(i => n.add(i.id)));
+  closeSheet(); render(); toast(t('loaded', n.size));
+}
+
+/* ---------- render ---------- */
+function setupHTML(inSheet) {
+  return `<div class="setup">${inSheet ? `<h2>${esc(t('updateItems'))}</h2><p class="hint" style="margin:0 0 10px">${esc(t('keepScans'))}</p>` : `<h2>${esc(t('setupTitle'))}</h2>`}
+    <ol><li>${esc(t('setup1'))}</li><li>${esc(t('setup2'))}</li></ol>
+    <textarea class="paste" id="paste-items" placeholder="${esc(t('pastePh'))}" aria-label="${esc(t('pastePh'))}" dir="auto"></textarea>
+    <p class="err" id="load-err" hidden></p>
+    <div class="row"><button class="btn primary" id="load-btn" type="button">${esc(t('load'))}</button>
+      <span class="btn file-btn">${icon('list', 18)}${esc(t('orFile'))}<input type="file" id="load-file" accept=".csv,text/csv,text/plain" aria-label="${esc(t('orFile'))}"></span></div>
+    ${inSheet ? `<div class="sheet-actions"><button class="btn" data-close type="button">${esc(t('cancel'))}</button></div>` : ''}</div>`;
+}
+function wireSetup(root) {
+  const err = msg => { const e = $('#load-err', root); e.textContent = msg; e.hidden = !msg; };
+  $('#load-btn', root).onclick = () => { const r = parseItems($('#paste-items', root).value); if (!r) { err(t('loadBad')); return; } applyItems(r); };
+  $('#load-file', root).addEventListener('change', async ev => {
+    const f = ev.target.files && ev.target.files[0]; ev.target.value = ''; if (!f) return;
+    const buf = await f.arrayBuffer(); let text = new TextDecoder('utf-8').decode(buf);
+    if (text.indexOf('�') >= 0) { try { text = new TextDecoder('windows-1255').decode(buf); } catch (e) { /* keep */ } }
+    const r = parseItems(text); if (!r) { err(t('loadBad')); return; } applyItems(r);
+  });
+}
+function itemRow(it, roomName) {
+  const saved = it.c.length, fresh = newCodes(it.id).filter(c => !it.c.includes(c)).length;
+  const meta = [];
+  if (roomName) meta.push(`<span><bdi>${esc(roomName)}</bdi></span>`);
+  if (saved + fresh) meta.push(`<span class="has">${esc(t('nBarcodes', saved + fresh))}</span>`); else meta.push(`<span class="none">${esc(t('noBarcode'))}</span>`);
+  if (fresh) meta.push(`<span class="pill">${esc(t('nNew', fresh))}</span>`);
+  return `<li><button class="item" data-act="scan" data-id="${esc(it.id)}" aria-label="${esc(t('scanItem', it.n))}">
+    <span class="item-main"><span class="item-name"><bdi>${esc(it.n)}</bdi></span><span class="item-meta">${meta.join('')}</span></span>
+    <span class="cam-tap" aria-hidden="true">${icon('camera', 22)}</span></button></li>`;
+}
+function render() {
+  document.documentElement.lang = S.lang; document.documentElement.dir = S.lang === 'he' ? 'rtl' : 'ltr';
+  document.title = S.lang === 'he' ? 'סורק חדר אחר חדר' : 'Room by room scanner';
+  const app = $('#app');
+  const head = `<header class="top wrap"><div class="top-row"><h1 class="brand">${esc(t('title'))}</h1>
+    <button class="icon-btn" data-act="menu" aria-label="${esc(t('menu'))}">${icon('dots')}</button></div>
+    ${S.rooms ? `<label class="search">${icon('search', 20)}<input type="search" id="q" value="${esc(query)}" placeholder="${esc(t('search'))}" aria-label="${esc(t('search'))}" dir="auto" autocomplete="off"></label>` : ''}</header>`;
+  if (!S.rooms) { app.innerHTML = head + `<main class="wrap">${setupHTML(false)}</main>`; wireSetup(app); return; }
+  const missing = it => !allCodes(it.id).length;
+  let body;
+  if (query.trim()) {
+    const q = norm(query), seen = new Set(), rows = [];
+    S.rooms.forEach(r => r.items.forEach(it => { if (!seen.has(it.id) && norm(it.n).includes(q)) { seen.add(it.id); rows.push(itemRow(it, roomsOf(it.id).join(', '))); } }));
+    body = `<main class="wrap">${rows.length ? `<ul class="items">${rows.join('')}</ul>` : `<p class="empty">${esc(t('noMatch'))}</p>`}</main>`;
+  } else {
+    S.room = Math.max(0, Math.min(S.room, S.rooms.length - 1));
+    const room = S.rooms[S.room];
+    const chips = S.rooms.map((r, i) => { const m = r.items.filter(missing).length; return `<button class="chip" role="tab" aria-selected="${i === S.room}" data-act="room" data-i="${i}"><bdi>${esc(r.n)}</bdi>${m ? `<small>${m}</small>` : ''}</button>`; }).join('');
+    const list = room.items.filter(it => !S.onlyMissing || missing(it));
+    body = `<div class="strip-wrap"><div class="strip wrap" role="tablist">${chips}</div></div>
+      <main class="wrap"><label class="toggle"><input type="checkbox" id="only"${S.onlyMissing ? ' checked' : ''}>${esc(t('onlyMissing'))}</label>
+      <h2 class="room-name"><bdi>${esc(room.n)}</bdi></h2>
+      ${list.length ? `<ul class="items">${list.map(it => itemRow(it, '')).join('')}</ul>` : `<p class="empty">${esc(t('noItems'))}</p>`}</main>`;
+  }
+  const n = S.scans.length;
+  const bar = `<div class="bar"><div class="wrap"><button class="bar-count" data-act="scans">${esc(n ? t('scans', n) : t('noScans'))}<small>${esc(n ? t('reviewHint') : t('scansHint'))}</small></button>
+    ${n ? `<button class="btn primary" data-act="copy" aria-label="${esc(t('copyFor'))}">${icon('copy', 18)}${esc(t('copyShort'))}</button>` : ''}</div></div>`;
+  const focused = document.activeElement && document.activeElement.id === 'q';
+  const sel = focused ? document.activeElement.selectionStart : null;
+  const sx = $('.strip') ? $('.strip').scrollLeft : 0;
+  app.innerHTML = head + body + bar;
+  const strip = $('.strip'); if (strip) { strip.scrollLeft = sx; const c = strip.querySelector('[aria-selected="true"]'); if (c && !sx) c.scrollIntoView({ inline: 'center', block: 'nearest' }); }
+  const qi = $('#q'); if (qi) { qi.addEventListener('input', () => { query = qi.value; render(); }); if (focused) { qi.focus(); try { qi.setSelectionRange(sel, sel); } catch (e) { /* ok */ } } }
+  const only = $('#only'); if (only) only.addEventListener('change', () => { S.onlyMissing = only.checked; save(); render(); });
+}
+
+/* ---------- toast ---------- */
+let toastTimer = 0;
+function toast(msg, undo) {
+  const el = $('#toast');
+  el.innerHTML = `<span>${esc(msg)}</span>${undo ? `<button class="undo" type="button">${esc(t('undo'))}</button>` : ''}`;
+  if (undo) el.querySelector('button').onclick = () => { undo(); el.classList.remove('show'); };
+  el.classList.add('show'); clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => el.classList.remove('show'), undo ? 6000 : 3500);
+}
+
+/* ---------- sheets ---------- */
+function openSheet(html, mount) {
+  const root = $('#sheet');
+  root.innerHTML = `<div class="backdrop" data-close></div><div class="sheet" role="dialog" aria-modal="true" tabindex="-1">${html}</div>`;
+  root.hidden = false;
+  const sh = $('.sheet', root);
+  if (mount) mount(sh);
+  sh.focus({ preventScroll: true });
+}
+function closeSheet() { const root = $('#sheet'); root.hidden = true; root.innerHTML = ''; }
+$('#sheet').addEventListener('click', ev => { if (ev.target.closest('[data-close]')) closeSheet(); });
+
+function menuSheet() {
+  openSheet(`<h2>${esc(t('menu'))}</h2>
+    <div class="seg" role="group" aria-label="${esc(t('language'))}"><button data-lang="en" aria-pressed="${S.lang === 'en'}" lang="en">English</button><button data-lang="he" aria-pressed="${S.lang === 'he'}" lang="he">עברית</button></div>
+    <ul class="menu-list">
+      ${S.rooms ? `<li><button data-m="items">${icon('refresh')}${esc(t('updateItems'))}</button></li>` : ''}
+      <li><button data-m="scans">${icon('list')}${esc(t('scansTitle'))}</button></li>
+    </ul>
+    <div class="sheet-actions"><button class="btn" data-close>${esc(t('done'))}</button></div>`,
+  sh => {
+    sh.querySelectorAll('[data-lang]').forEach(b => b.onclick = () => { S.lang = b.dataset.lang; save(); render(); menuSheet(); });
+    sh.querySelectorAll('[data-m]').forEach(b => b.onclick = () => {
+      if (b.dataset.m === 'items') openSheet(setupHTML(true), wireSetup);
+      else scansSheet();
+    });
+  });
+}
+function scansText() {
+  return SCANS_TAG + '\n' + JSON.stringify({ scans: S.scans.map(s => s.l ? { id: s.id, n: s.n, c: s.c, l: s.l } : { id: s.id, n: s.n, c: s.c }) });
+}
+async function copyScans() {
+  const text = scansText();
+  let ok = false;
+  try { if (navigator.clipboard && navigator.clipboard.writeText) { await navigator.clipboard.writeText(text); ok = true; } } catch (e) { ok = false; }
+  if (!ok) {
+    try { const ta = document.createElement('textarea'); ta.value = text; ta.style.cssText = 'position:fixed;top:0;opacity:0'; document.body.appendChild(ta); ta.select(); ok = document.execCommand('copy'); ta.remove(); } catch (e) { ok = false; }
+  }
+  scansSheet(ok ? 'copied' : 'fail');
+}
+function scansSheet(after) {
+  const groups = new Map();
+  S.scans.forEach((s, i) => { if (!groups.has(s.id)) groups.set(s.id, { n: s.n, rows: [] }); groups.get(s.id).rows.push([s, i]); });
+  let armed = false;
+  openSheet(`<h2>${esc(t('scansTitle'))}</h2>
+    ${after === 'copied' ? `<p class="hint" style="margin:0 0 8px;color:var(--ok);font-weight:600">${esc(t('copied'))}</p>` : ''}
+    ${after === 'fail' ? `<p class="hint" style="margin:0 0 8px">${esc(t('copyFail'))}</p><textarea class="paste" readonly>${esc(scansText())}</textarea>` : ''}
+    ${S.scans.length ? [...groups.values()].map(g => `<h3><bdi>${esc(g.n)}</bdi></h3><ul class="scan-list">${g.rows.map(([s, i]) => `<li><span class="num" dir="ltr">${esc(s.c)}</span><span class="lbl"><bdi>${esc(s.l || '')}</bdi></span><button class="mini" data-del="${i}" aria-label="${esc(t('remove', s.c))}">${icon('trash', 20)}</button></li>`).join('')}</ul>`).join('') : `<p class="hint">${esc(t('noScans'))}. ${esc(t('scansHint'))}</p>`}
+    <div class="sheet-actions">${S.scans.length ? `<button class="btn danger" data-clear>${esc(t('clear'))}</button><button class="btn primary" data-copy>${icon('copy', 18)}${esc(t('copyFor'))}</button>` : `<button class="btn" data-close>${esc(t('done'))}</button>`}</div>`,
+  sh => {
+    sh.querySelectorAll('[data-del]').forEach(b => b.onclick = () => { S.scans.splice(+b.dataset.del, 1); save(); render(); scansSheet(); });
+    const cp = $('[data-copy]', sh); if (cp) cp.onclick = copyScans;
+    const cl = $('[data-clear]', sh);
+    if (cl) cl.onclick = () => {
+      if (!armed) { armed = true; cl.textContent = t('clearSure'); return; }
+      S.scans = []; save(); render(); closeSheet(); toast(t('cleared'));
+    };
+    const ta = $('textarea', sh); if (ta) setTimeout(() => { ta.focus(); ta.select(); }, 60);
+  });
+}
+
+/* ---------- barcode reading ---------- */
+let detector = null, detectorP = null, zxingP = null;
+function getDetector() {
+  if (detectorP) return detectorP;
+  detectorP = (async () => {
+    if (!('BarcodeDetector' in window)) return null;
+    try {
+      const sup = await BarcodeDetector.getSupportedFormats();
+      const f = ['ean_13', 'ean_8', 'upc_a', 'upc_e', 'code_128'].filter(x => sup.includes(x));
+      return f.length ? new BarcodeDetector({ formats: f }) : null;
+    } catch (e) { return null; }
+  })();
+  return detectorP;
+}
+function loadZXing() {
+  if (window.ZXing) return Promise.resolve(window.ZXing);
+  if (!zxingP) zxingP = new Promise((res, rej) => {
+    const sc = document.createElement('script'); sc.src = ZXING_URL; sc.async = true;
+    sc.onload = () => window.ZXing ? res(window.ZXing) : rej(new Error('zxing'));
+    sc.onerror = () => { zxingP = null; rej(new Error('zxing')); };
+    document.head.appendChild(sc);
+  });
+  return zxingP;
+}
+let zxReader = null;
+async function zxDecodeCanvas(canvas, hard) {
+  const Z = await loadZXing();
+  if (!zxReader || hard !== zxReader.hard) {
+    const hints = new Map();
+    hints.set(Z.DecodeHintType.POSSIBLE_FORMATS, [Z.BarcodeFormat.EAN_13, Z.BarcodeFormat.EAN_8, Z.BarcodeFormat.UPC_A, Z.BarcodeFormat.UPC_E, Z.BarcodeFormat.CODE_128]);
+    if (hard) hints.set(Z.DecodeHintType.TRY_HARDER, true);
+    zxReader = new Z.MultiFormatReader(); zxReader.setHints(hints); zxReader.hard = hard;
+  }
+  try { return zxReader.decode(new Z.BinaryBitmap(new Z.HybridBinarizer(new Z.HTMLCanvasElementLuminanceSource(canvas)))).getText(); } catch (e) { return null; }
+}
+const okCode = v => /^\d{8,14}$/.test(v || '');
+function drawTo(src, w, h, max, rot) {
+  const k = Math.min(1, max / Math.max(w, h)), cw = Math.max(1, Math.round(w * k)), ch = Math.max(1, Math.round(h * k));
+  const c = document.createElement('canvas'); c.width = rot ? ch : cw; c.height = rot ? cw : ch;
+  const g = c.getContext('2d'); if (rot) { g.translate(ch, 0); g.rotate(Math.PI / 2); }
+  g.drawImage(src, 0, 0, cw, ch); return c;
+}
+async function readPhoto(file) {
+  let src;
+  try { src = await createImageBitmap(file, { imageOrientation: 'from-image' }); }
+  catch (e) { src = await new Promise((res, rej) => { const u = URL.createObjectURL(file), im = new Image(); im.onload = () => { URL.revokeObjectURL(u); res(im); }; im.onerror = rej; im.src = u; }); }
+  const det = await getDetector();
+  if (det) { for (const rot of [false, true]) { try { const r = await det.detect(drawTo(src, src.width, src.height, 2000, rot)); const h = r.find(x => okCode(x.rawValue)); if (h) return h.rawValue; } catch (e) { /* next */ } } }
+  for (const [max, rot] of [[1600, false], [1000, false], [2400, false], [1200, true]]) { await sleep(0); const v = await zxDecodeCanvas(drawTo(src, src.width, src.height, max, rot), true); if (okCode(v)) return v; }
+  return null;
+}
+
+/* ---------- scan sheet ---------- */
+const SC = { id: null, stream: null, timer: 0, last: null, hits: 0, live: false, torch: false, frame: null };
+function stopCamera() {
+  clearTimeout(SC.timer); SC.live = false;
+  if (SC.stream) SC.stream.getTracks().forEach(tr => tr.stop());
+  SC.stream = null;
+}
+function closeScan() { stopCamera(); const el = $('#scan'); el.hidden = true; el.innerHTML = ''; SC.id = null; render(); }
+function openScan(id) {
+  const it = itemById(id); if (!it) return;
+  SC.id = id; SC.last = null; SC.hits = 0; SC.torch = false;
+  const el = $('#scan');
+  el.innerHTML = `<div class="scan-head"><button class="icon-btn" data-sc="close" aria-label="${esc(t('close'))}">${icon('x')}</button>
+      <span class="title"><bdi>${esc(it.n)}</bdi></span>
+      <button class="icon-btn" data-sc="torch" aria-label="${esc(t('torch'))}" aria-pressed="false" hidden>${icon('torch')}</button></div>
+    <div class="view"><video playsinline muted autoplay></video><div class="aim" aria-hidden="true"></div><p class="msg" aria-live="polite">${esc(t('starting'))}</p></div>
+    <div class="panel" id="panel"></div>`;
+  el.hidden = false;
+  showEntry();
+  el.querySelector('[data-sc="close"]').onclick = closeScan;
+  el.querySelector('[data-sc="torch"]').onclick = toggleTorch;
+  startCamera();
+}
+function setMsg(text) { const m = $('#scan .msg'); if (m) m.textContent = text; }
+function showEntry(error) {
+  const p = $('#panel'); if (!p) return;
+  p.innerHTML = `${error ? `<p class="note warn" style="margin:0 0 8px">${esc(error)}</p>` : ''}
+    <label class="field" style="margin-top:0"><span>${esc(t('typeNum'))}</span><span class="inline"><input id="typed" inputmode="numeric" autocomplete="off" dir="ltr" enterkeyhint="done"><button class="btn" id="typed-add" type="button">${esc(t('add'))}</button></span></label>
+    <p class="note warn" id="typed-err" hidden></p>
+    <div class="alt" style="margin-top:12px"><span class="btn file-btn">${icon('image', 18)}${esc(t('photo'))}<input type="file" id="photo" accept="image/*" aria-label="${esc(t('photo'))}"></span></div>
+    <p class="note" id="photo-msg" hidden></p>`;
+  const typed = $('#typed'), terr = $('#typed-err');
+  const addTyped = () => { const v = typed.value.replace(/[\s-]/g, ''); if (!okCode(v)) { terr.textContent = t('badNum'); terr.hidden = false; return; } found(v); };
+  $('#typed-add').onclick = addTyped;
+  typed.addEventListener('keydown', e => { if (e.key === 'Enter' && !e.isComposing) { e.preventDefault(); addTyped(); } });
+  $('#photo').addEventListener('change', async ev => {
+    const f = ev.target.files && ev.target.files[0]; ev.target.value = ''; if (!f) return;
+    const pm = $('#photo-msg'); pm.textContent = t('reading'); pm.className = 'note'; pm.hidden = false;
+    let v = null; try { v = await readPhoto(f); } catch (e) { v = null; }
+    if (!$('#photo-msg')) return;
+    if (v) found(v); else { pm.textContent = t('photoFail'); pm.className = 'note warn'; }
+  });
+}
+async function startCamera() {
+  if (!window.isSecureContext) { setMsg(''); showEntry(t('camInsecure')); return; }
+  if (!(navigator.mediaDevices && navigator.mediaDevices.getUserMedia)) { setMsg(''); showEntry(t('camNone')); return; }
+  let stream;
+  try { stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: { ideal: 'environment' }, width: { ideal: 1920 }, height: { ideal: 1080 } }, audio: false }); }
+  catch (e) {
+    setMsg('');
+    showEntry(e && e.name === 'NotAllowedError' ? t('camBlocked') : t('camFail', (e && e.name) || 'error'));
+    return;
+  }
+  if (!SC.id) { stream.getTracks().forEach(tr => tr.stop()); return; }
+  SC.stream = stream;
+  const v = $('#scan video'); v.srcObject = stream;
+  try { await v.play(); } catch (e) { /* muted autoplay */ }
+  const track = stream.getVideoTracks()[0];
+  try { const caps = track.getCapabilities ? track.getCapabilities() : {}; if (caps.torch) $('#scan [data-sc="torch"]').hidden = false; if (caps.focusMode && caps.focusMode.includes('continuous')) track.applyConstraints({ advanced: [{ focusMode: 'continuous' }] }).catch(() => {}); } catch (e) { /* optional */ }
+  setMsg(t('aim'));
+  SC.live = true; SC.last = null; SC.hits = 0;
+  detector = await getDetector();
+  if (!detector) loadZXing().catch(() => {});
+  tick();
+}
+function toggleTorch() {
+  if (!SC.stream) return;
+  const track = SC.stream.getVideoTracks()[0]; SC.torch = !SC.torch;
+  track.applyConstraints({ advanced: [{ torch: SC.torch }] }).catch(() => { SC.torch = false; });
+  const b = $('#scan [data-sc="torch"]'); if (b) b.setAttribute('aria-pressed', String(SC.torch));
+}
+async function tick() {
+  clearTimeout(SC.timer);
+  if (!SC.live) return;
+  const v = $('#scan video');
+  let code = null;
+  if (v && v.readyState >= 2 && v.videoWidth) {
+    if (detector) {
+      try { const r = await detector.detect(v); const h = r.find(x => okCode(x.rawValue)); if (h) code = h.rawValue; } catch (e) { /* keep going */ }
+    } else if (window.ZXing) {
+      const vw = v.videoWidth, vh = v.videoHeight;
+      if (!SC.frame) SC.frame = document.createElement('canvas');
+      const k = Math.min(1, 1000 / vw); SC.frame.width = Math.round(vw * k); SC.frame.height = Math.round(vh * k);
+      SC.frame.getContext('2d').drawImage(v, 0, 0, SC.frame.width, SC.frame.height);
+      code = await zxDecodeCanvas(SC.frame, false);
+      if (!okCode(code)) code = null;
+    }
+  }
+  if (!SC.live) return;
+  if (code) {
+    if (code === SC.last) SC.hits++; else { SC.last = code; SC.hits = 1; }
+    if (SC.hits >= 2) { found(code); return; }
+  }
+  SC.timer = setTimeout(tick, detector ? 120 : 220);
+}
+function found(code) {
+  SC.live = false; clearTimeout(SC.timer);
+  const aim = $('#scan .aim'); if (aim) aim.classList.add('hit');
+  try { navigator.vibrate && navigator.vibrate(70); } catch (e) { /* none */ }
+  const it = itemById(SC.id); if (!it) return;
+  const dup = allCodes(it.id).includes(code);
+  const others = otherItemsWith(code, it.id);
+  setMsg('');
+  const p = $('#panel');
+  p.innerHTML = `<p class="note" style="margin:0">${esc(t('found'))}</p><p class="code-big" dir="ltr">${esc(code)}</p>
+    ${dup ? `<p class="note warn">${esc(t('dupHere'))}</p>` : ''}
+    ${others.length ? `<p class="note">${esc(t('alsoOn', others.map(iso).join(', ')))}</p>` : ''}
+    ${dup ? '' : `<label class="field"><span>${esc(t('labelOpt'))}</span><input id="lbl" placeholder="${esc(t('labelPh'))}" dir="auto" autocomplete="off" enterkeyhint="done"></label>`}
+    <div class="actions">${dup ? `<button class="btn primary wide" data-r="again">${esc(t('again'))}</button>` :
+      `<button class="btn primary wide" data-r="save">${esc(t('save'))}</button><button class="btn" data-r="more">${esc(t('saveMore'))}</button><button class="btn" data-r="again">${esc(t('again'))}</button>`}</div>`;
+  const doSave = () => {
+    const l = tidy(($('#lbl') || {}).value);
+    const scan = l ? { id: it.id, n: it.n, c: code, l, t: Date.now() } : { id: it.id, n: it.n, c: code, t: Date.now() };
+    S.scans.push(scan); save();
+    return scan;
+  };
+  p.querySelectorAll('[data-r]').forEach(b => b.onclick = () => {
+    const r = b.dataset.r;
+    if (r === 'again') { resume(); return; }
+    const scan = doSave();
+    const undo = () => { const i = S.scans.indexOf(scan); if (i >= 0) { S.scans.splice(i, 1); save(); render(); } };
+    if (r === 'save') { closeScan(); toast(t('saved', iso(it.n)), undo); }
+    else { toast(t('saved', iso(it.n)), undo); resume(); }
+  });
+  const lbl = $('#lbl'); if (lbl) lbl.addEventListener('keydown', e => { if (e.key === 'Enter' && !e.isComposing) { e.preventDefault(); p.querySelector('[data-r="save"]').click(); } });
+}
+function resume() {
+  const aim = $('#scan .aim'); if (aim) aim.classList.remove('hit');
+  showEntry();
+  if (SC.stream) { setMsg(t('aim')); SC.live = true; SC.last = null; SC.hits = 0; tick(); }
+  else startCamera();
+}
+document.addEventListener('visibilitychange', () => { if (document.hidden && SC.id) { stopCamera(); setMsg(''); } else if (!document.hidden && SC.id && !SC.stream && !$('#panel .code-big')) startCamera(); });
+
+/* ---------- events ---------- */
+$('#app').addEventListener('click', ev => {
+  const b = ev.target.closest('[data-act]'); if (!b || b.disabled) return;
+  const a = b.dataset.act;
+  if (a === 'menu') menuSheet();
+  else if (a === 'room') { S.room = +b.dataset.i; save(); render(); window.scrollTo(0, 0); }
+  else if (a === 'scan') openScan(b.dataset.id);
+  else if (a === 'scans') scansSheet();
+  else if (a === 'copy') copyScans();
+});
+document.addEventListener('keydown', ev => {
+  if (ev.key !== 'Escape') return;
+  if (!$('#sheet').hidden) closeSheet(); else if (!$('#scan').hidden) closeScan();
+});
+
+render();
+getDetector();
+})();
+</script>
+</body>
+</html>
